@@ -24,12 +24,12 @@ def fitness(individual):
     """
     fitness_val = 0
     for elem in individual:
-        i = elem.get('triton')
-        sorted_triton = copy.copy(sorted(i))
-        set_of_notes = set(sorted_triton)
-        note_1 = sorted_triton.pop()
-        note_2 = sorted_triton.pop()
-        note_3 = sorted_triton.pop()
+        i = elem.get('tritone')
+        sorted_tritone = copy.copy(sorted(i))
+        set_of_notes = set(sorted_tritone)
+        note_1 = sorted_tritone.pop()
+        note_2 = sorted_tritone.pop()
+        note_3 = sorted_tritone.pop()
         consonant_score = 0
         k = 0
         for note in elem.get('notes'):
@@ -50,7 +50,7 @@ def fitness(individual):
                 bad = 1
         if bad == 1:
             cord_score = 0
-        if (note_1 - note_3) > 13:
+        if (note_1 - note_3) > 12:
             cord_score = 0
         if 3 != len(set_of_notes):
             cord_score = 0
@@ -67,9 +67,9 @@ def mutation(individual):
     :param individual: an individual which is a dictionary containing generated chords for accompaniment.
     """
     for elem in individual:
-        elem.get('triton')[0] = (elem.get('triton')[0] + randint(-7, 7)) % (octave + DELTA + 1)
-        elem.get('triton')[1] = (elem.get('triton')[1] + randint(-7, 7)) % (octave + DELTA + 1)
-        elem.get('triton')[2] = (elem.get('triton')[2] + randint(-7, 7)) % (octave + DELTA + 1)
+        elem.get('tritone')[0] = (elem.get('tritone')[0] + randint(-7, 7)) % (octave + DELTA + 1)
+        elem.get('tritone')[1] = (elem.get('tritone')[1] + randint(-7, 7)) % (octave + DELTA + 1)
+        elem.get('tritone')[2] = (elem.get('tritone')[2] + randint(-7, 7)) % (octave + DELTA + 1)
 
 
 def crossover(population):
@@ -131,12 +131,12 @@ def retrieve_information():
     :return: mid - object which contain information about initial melody,
     gen - frame for individual with information about notes in initial melody at certain time,
     octave - some offset which indicates in what octaves we can generate melody,
-    q - quant which indicates how long each triton would play.
+    q - time variable which indicates how long each tritone would play.
     """
     mid = MidiFile(FILE_NAME, clip=True)
     total_time = 0
     song_msg = []
-    q = mid.ticks_per_beat * 2  # 1/2 of tact
+    q = mid.ticks_per_beat * 2  # 1/2 of tact, or 2 quarters
     min_note = 999
     for track in mid.tracks:
         for msg in track:
@@ -145,7 +145,7 @@ def retrieve_information():
                 min_note = msg.note
             song_msg.append(msg.copy())
     octave = (min_note // 12 - 2) * 12
-    gen = [{'notes': [], 'time': (i + 1) * q, 'triton': []} for i in range(total_time // q)]
+    gen = [{'notes': [], 'time': (i + 1) * q, 'tritone': []} for i in range(total_time // q)]
     for track in mid.tracks:
         cur_time = 0
         ptr = 0
@@ -185,9 +185,9 @@ def generate_population(template):
     for j in population:
         for i in j:
             val = random.sample(range(0, DELTA-1), 3)
-            i.get('triton').append(val.pop() + octave)
-            i.get('triton').append(val.pop() + octave)
-            i.get('triton').append(val.pop() + octave)
+            i.get('tritone').append(val.pop() + octave)
+            i.get('tritone').append(val.pop() + octave)
+            i.get('tritone').append(val.pop() + octave)
     return population
 
 
@@ -201,13 +201,13 @@ def save_melody_with_accompaniment():
     best_accompaniment = population[0]
     print(fitness(best_accompaniment))
     for elem in best_accompaniment:
-        triton = elem.get('triton')
-        accompaniment_track.append(Message('note_on', note=triton[0], time=0))
-        accompaniment_track.append(Message('note_on', note=triton[1], time=0))
-        accompaniment_track.append(Message('note_on', note=triton[2], time=0))
-        accompaniment_track.append(Message('note_off', note=triton[0], time=q))
-        accompaniment_track.append(Message('note_off', note=triton[1], time=0))
-        accompaniment_track.append(Message('note_off', note=triton[2], time=0))
+        tritone = elem.get('tritone')
+        accompaniment_track.append(Message('note_on', note=tritone[0], time=0))
+        accompaniment_track.append(Message('note_on', note=tritone[1], time=0))
+        accompaniment_track.append(Message('note_on', note=tritone[2], time=0))
+        accompaniment_track.append(Message('note_off', note=tritone[0], time=q))
+        accompaniment_track.append(Message('note_off', note=tritone[1], time=0))
+        accompaniment_track.append(Message('note_off', note=tritone[2], time=0))
     accompaniment.tracks.append(accompaniment_track)
     accompaniment.save('accompaniment.mid')
     for track in mid.tracks:
