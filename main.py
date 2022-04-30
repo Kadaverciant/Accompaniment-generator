@@ -1,9 +1,10 @@
 import random
-from mido import MidiFile, Message, MidiTrack
+from mido import MidiFile, Message, MidiTrack, MetaMessage
 from random import randint, shuffle
 import copy
 
-FILE_NAME = 'barbiegirl.mid'
+# FILE_NAME = r'...\barbiegirl.mid'  # insert the absolute path to the midi file
+FILE_NAME = 'input3.mid'  # or use just the file name if it is stored in the same folder as the code being run
 MUTATION = 1
 CROSSOVER = 0.6
 NUM_OF_GENERATIONS = 100
@@ -12,6 +13,8 @@ INTERVALS = [5, 7, 3, 4, 8, 9]
 CONSONANT = [1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0]
 DELTA = 24
 MIN_NOTE = 0
+VELOCITY = 100
+TEMPO = 0
 
 
 def fitness(individual):
@@ -39,6 +42,9 @@ def fitness(individual):
             notes_score += CONSONANT[abs(note - note_2) % 12]
             notes_score += CONSONANT[abs(note - note_2) % 12]
             consonant_score += notes_score
+        if k == 0:
+            k = 1/3
+            consonant_score = 1
         consonant_score /= (3*k)
         cord_score = 0
         set_of_intervals = [note_1 - note_2, note_2 - note_3, (note_3 - note_1 + 12) % 12]
@@ -54,8 +60,8 @@ def fitness(individual):
             cord_score = 0
         if 3 != len(set_of_notes):
             cord_score = 0
-        if note_1 > octave + DELTA or note_2 > octave + DELTA or note_3 > octave + DELTA or note_1 < MIN_NOTE - DELTA \
-                or note_2 < MIN_NOTE - DELTA or note_3 < MIN_NOTE - DELTA:
+        if note_1 >= octave + DELTA or note_2 >= octave + DELTA or note_3 >= octave + DELTA \
+                or note_1 < MIN_NOTE - DELTA or note_2 < MIN_NOTE - DELTA or note_3 < MIN_NOTE - DELTA:
             cord_score = 0
         fitness_val += cord_score*consonant_score
     return fitness_val
@@ -136,13 +142,19 @@ def retrieve_information():
     mid = MidiFile(FILE_NAME, clip=True)
     total_time = 0
     song_msg = []
+    velocity = 0
+    tempo = 0
     q = mid.ticks_per_beat * 2  # 1/2 of tact, or 2 quarters
     min_note = 999
     for track in mid.tracks:
         for msg in track:
+            # print(msg)
             total_time += msg.time
             if msg.type == 'note_on' and msg.note < min_note:
                 min_note = msg.note
+                velocity = msg.velocity
+            if msg.type == 'set_tempo':
+                tempo = msg.tempo
             song_msg.append(msg.copy())
     octave = (min_note // 12 - 2) * 12
     gen = [{'notes': [], 'time': (i + 1) * q, 'tritone': []} for i in range(total_time // q)]
@@ -154,13 +166,13 @@ def retrieve_information():
         for elem in gen:
             notes = elem.get('notes')
             notes += cur_notes
-            finishTime = elem.get('time')
-            while length > ptr and cur_time + song_msg[ptr].time <= finishTime:
+            finish_time = elem.get('time')
+            while length > ptr+1 and cur_time + song_msg[ptr].time <= finish_time:
                 ptr += 1
                 msg = song_msg[ptr]
                 cur_time += msg.time
                 if msg.type == 'note_on':
-                    if cur_time != finishTime:
+                    if cur_time != finish_time:
                         if msg.note not in notes:
                             notes.append(msg.note)
                     else:
@@ -169,7 +181,7 @@ def retrieve_information():
                 else:
                     if msg.type == 'note_off' and msg.note in cur_notes:
                         cur_notes.remove(msg.note)
-    return mid, gen, octave, q
+    return mid, gen, octave, q, min_note, velocity, tempo
 
 
 def generate_population(template):
@@ -199,24 +211,29 @@ def save_melody_with_accompaniment():
     accompaniment_track = MidiTrack()
     full_song = MidiFile()
     best_accompaniment = population[0]
+    # for i in best_accompaniment:
+    #     print(i)
     print(fitness(best_accompaniment))
+    if TEMPO != 0:
+        accompaniment_track.append(MetaMessage('set_tempo', tempo=TEMPO, time=0))
+    accompaniment_track.append(MetaMessage('track_name', name='Elec. Piano (Classic)', time=0))
     for elem in best_accompaniment:
         tritone = elem.get('tritone')
-        accompaniment_track.append(Message('note_on', note=tritone[0], time=0))
-        accompaniment_track.append(Message('note_on', note=tritone[1], time=0))
-        accompaniment_track.append(Message('note_on', note=tritone[2], time=0))
-        accompaniment_track.append(Message('note_off', note=tritone[0], time=q))
-        accompaniment_track.append(Message('note_off', note=tritone[1], time=0))
-        accompaniment_track.append(Message('note_off', note=tritone[2], time=0))
+        accompaniment_track.append(Message('note_on', note=tritone[0], velocity=VELOCITY, time=0))
+        accompaniment_track.append(Message('note_on', note=tritone[1], velocity=VELOCITY, time=0))
+        accompaniment_track.append(Message('note_on', note=tritone[2], velocity=VELOCITY, time=0))
+        accompaniment_track.append(Message('note_off', note=tritone[0], velocity=VELOCITY, time=q))
+        accompaniment_track.append(Message('note_off', note=tritone[1], velocity=VELOCITY, time=0))
+        accompaniment_track.append(Message('note_off', note=tritone[2], velocity=VELOCITY, time=0))
     accompaniment.tracks.append(accompaniment_track)
-    accompaniment.save('accompaniment.mid')
+    # accompaniment.save('accompaniment.mid')
     for track in mid.tracks:
         full_song.tracks.append(track)
     full_song.tracks.append(accompaniment_track)
-    full_song.save('full_song.mid')
+    full_song.save('Output1.mid')
 
 
-mid, template, octave, q = retrieve_information()
+mid, template, octave, q, MIN_NOTE, VELOCITY, TEMPO = retrieve_information()
 population = generate_population(template)
 population = evolution(population, NUM_OF_GENERATIONS)
 save_melody_with_accompaniment()
